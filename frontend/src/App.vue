@@ -1,0 +1,103 @@
+<script setup>
+import ListScenario from './components/ListScenario.vue';
+import Report from './components/Report.vue';
+import { ref, onMounted } from 'vue';
+
+const list = ref([]);
+const currentReport = ref(null); // Для хранения текущего отчета
+
+const fetchScenarios = async () => {
+  try {
+    // Указание метода GET в параметрах fetch
+    const response = await fetch('/api/scenarios/', { method: 'GET' });
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    const data = await response.json();
+    list.value = data;
+  } catch (error) {
+    console.error('Error fetching scenarios:', error);
+  }
+};
+
+const handleReportFetched = (report) => {
+  currentReport.value = report;
+};
+
+onMounted(fetchScenarios);
+</script>
+
+<template>
+  <div class="container">
+    <div class="sidebar">
+      <h2>Проверка сценариев</h2>
+      <ListScenario v-for="scenario in list" :key="scenario.id" :msg="scenario" @report-fetched="handleReportFetched" />
+    </div>
+    <div class="main">
+      <Report :report="currentReport" />
+      <p v-if="!list.length">Нет доступных сценариев</p>
+    </div>
+  </div>
+</template>
+
+<style scoped>
+.container {
+  display: flex;
+  padding: 20px;
+  box-sizing: border-box;
+}
+
+.sidebar {
+  width: 30%;
+  background-color: #fff;
+  padding: 20px;
+  border-radius: 10px;
+  box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+}
+
+.sidebar h2 {
+  margin-top: 0;
+  font-size: 18px;
+  font-weight: bold;
+  color: #333;
+}
+
+.main {
+  flex-grow: 1;
+  background-color: #fff;
+  padding: 20px;
+  margin-left: 20px;
+  border-radius: 10px;
+  box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+  display: flex;
+  flex-direction: column;
+}
+
+.main h2 {
+  font-size: 18px;
+  font-weight: bold;
+  margin-top: 0;
+  color: #333;
+}
+
+.report {
+  text-align: center;
+  color: #888;
+}
+
+.report img {
+  width: 100px;
+  height: auto;
+  margin-bottom: 20px;
+}
+
+.report p {
+  font-size: 16px;
+  margin: 0;
+}
+
+.report span {
+  font-size: 14px;
+  color: #888;
+}
+</style>

@@ -1,0 +1,123 @@
+
+<script setup>
+import { ref } from 'vue';
+import { toast } from 'vue3-toastify';
+
+const props = defineProps({
+  msg: Object,
+});
+const emit = defineEmits(['report-fetched']);
+
+const showModal = ref(false);
+const environment = ref('dev');
+const bankName = ref('dev');
+const customCase = ref('-w -s');
+const isExecuting = ref(false);
+
+const openModal = () => {
+  showModal.value = true;
+};
+
+const closeModal = () => {
+  showModal.value = false;
+};
+
+const executeScenario = async () => {
+  isExecuting.value = true;
+  try {
+    const response = await fetch(`http://localhost:8000/api/scenarios/${props.msg.id}/execute/`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        environment: environment.value,
+        bank_name: bankName.value,
+        custom_case: customCase.value,
+      }),
+    });
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Failed to execute scenario: ${response.status} ${errorText}`);
+    }
+    const data = await response.json();
+    const taskId = data.task_id;
+    toast.success('Scenario executed successfully');
+
+    await fetchReport(taskId);
+  } catch (error) {
+    console.error('Error executing scenario:', error);
+    toast.error('Failed to execute scenario');
+  } finally {
+    isExecuting.value = false;
+    closeModal();
+  }
+};
+
+const fetchReport = async (taskId) => {
+  try {
+    const response = await fetch(`http://localhost:8000/api/reports/${taskId}/`);
+    if (!response.ok) {
+      throw new Error('Failed to fetch report');
+    }
+    const report = await response.json();
+    emit('report-fetched', report);
+  } catch (error) {
+    console.error('Error fetching report:', error);
+  }
+};
+</script>
+
+<template>
+  <div>
+    <button @click="openModal">Запустить</button>
+    <div v-if="showModal" class="modal">
+      <div class="modal-content">
+        <h3>Настройка сценария</h3>
+        <label>
+          Environment (env):
+          <input v-model="environment" type="text" />
+        </label>
+        <label>
+          Bank Name (bname):
+          <input v-model="bankName" type="text" />
+        </label>
+        <label>
+          Custom Case:
+          <input v-model="customCase" type="text" />
+        </label>
+        <div class="modal-actions">
+          <button @click="closeModal">Отмена</button>
+          <button @click="executeScenario" :disabled="isExecuting">Ок</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</template>
+
+<style>
+.modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.modal-content {
+  background: white;
+  padding: 20px;
+  border-radius: 5px;
+  width: 300px;
+}
+
+.modal-actions {
+  margin-top: 20px;
+  display: flex;
+  justify-content: space-between;
+}
+</style>

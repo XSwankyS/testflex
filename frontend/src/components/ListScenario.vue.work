@@ -1,0 +1,166 @@
+<script setup>
+import { ref } from 'vue';
+import { toast } from 'vue3-toastify';
+import axios from 'axios';
+
+const props = defineProps({
+  msg: Object,
+});
+const emit = defineEmits(['report-fetched']);
+
+const showModal = ref(false);
+const environment = ref('dev');
+const bankName = ref('dev');
+const customCase = ref('-w -s');
+const isExecuting = ref(false);
+const reportContent = ref('Нет доступного отчета');
+
+const openModal = () => {
+  showModal.value = true;
+};
+
+const closeModal = () => {
+  showModal.value = false;
+};
+
+const executeScenario = async () => {
+  isExecuting.value = true;
+  try {
+    const response = await axios.post(`/api/scenarios/execute/${props.msg.id}/`, {
+      environment: environment.value,
+      bank_name: bankName.value,
+      custom_case: customCase.value,
+    });
+
+    const taskId = response.data.task_id;
+    toast.success('Scenario executed successfully');
+
+    await fetchResult(taskId);
+  } catch (error) {
+    console.error('Error executing scenario:', error);
+    toast.error('Failed to execute scenario');
+  } finally {
+    isExecuting.value = false;
+    closeModal();
+  }
+};
+
+const fetchResult = async (taskId) => {
+  const pollInterval = 2000; // Интервал опроса в миллисекундах
+  let maxAttempts = 10; // Максимальное количество попыток
+  let attempts = 0;
+
+  const poll = async () => {
+    try {
+      const response = await axios.get(`/api/executions/${taskId}/fetch_result/`);
+      console.log("Raw API Response:", response.data);
+
+      if (response.data.result) {
+        try {
+          const parsedResult = JSON.parse(response.data.result);
+          console.log("Parsed Result:", parsedResult);
+          reportContent.value = JSON.stringify(parsedResult, null, 2);
+          toast.success('Results fetched successfully!');
+        } catch (error) {
+          console.error("Error parsing result:", error);
+          reportContent.value = response.data.result;
+        }
+        isExecuting.value = false;
+        return; // Останавливаем опрос, так как результат готов
+      }
+
+      if (attempts < maxAttempts) {
+        console.warn("No result available yet, retrying...");
+        attempts++;
+        setTimeout(poll, pollInterval); // Ждём перед следующей попыткой
+      } else {
+        console.error("Max attempts reached, result not available.");
+        toast.error('Failed to fetch result: Max attempts reached.');
+        reportContent.value = response.data.message || 'Нет доступного отчета';
+        isExecuting.value = false;
+      }
+    } catch (error) {
+      console.error("Error fetching results:", error);
+      toast.error(`Error fetching results: ${error.message}`);
+      isExecuting.value = false;
+    }
+  };
+
+  isExecuting.value = true;
+  poll(); // Запускаем цикл опроса
+};
+</script>
+
+<template>
+  <div>
+    <h2>{{ msg.name }}</h2>
+    <button @click="openModal">Запустить</button>
+
+    <div v-if="showModal" class="modal">
+      <div class="modal-content">
+        <h3>Настройка сценария</h3>
+        <label>
+          Environment (env):
+          <input v-model="environment" type="text" />
+        </label>
+        <label>
+          Bank Name (bname):
+          <input v-model="bankName" type="text" />
+        </label>
+        <label>
+          Custom Case:
+          <input v-model="customCase" type="text" />
+        </label>
+        <div class="modal-actions">
+          <button @click="closeModal">Отмена</button>
+          <button @click="executeScenario" :disabled="isExecuting">Ок</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="report">
+      <h3>Отчет</h3>
+      <pre>{{ reportContent }}</pre>
+    </div>
+  </div>
+</template>
+
+<style>
+.modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.modal-content {
+  background: white;
+  padding: 20px;
+  border-radius: 5px;
+  width: 300px;
+}
+
+.modal-actions {
+  margin-top: 20px;
+  display: flex;
+  justify-content: space-between;
+}
+
+.report {
+  margin-top: 20px;
+}
+
+pre {
+  background: #f8f8f8;
+  padding: 10px;
+  border-radius: 5px;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+}
+</style>
+

@@ -1,0 +1,7 @@
+Received variables:
+environment: dev
+bank_name: gctpp
+custom_case: -s -v
+
+Constructed command:
+pytest -s -v --env=dev --bname=gctpp /app/sbptest/tests/modules/sbp.x2x/test_CheckParameters_C2C.py --json-report --json-report-file=/app/tmp/70_execution.json
